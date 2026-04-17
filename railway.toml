@@ -1,0 +1,19 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python unpin_bot.py"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
+
+[[services]]
+name = "unpin-bot"
+
+[services.variables]
+API_ID = "your_api_id"
+API_HASH = "your_api_hash"
+BOT_TOKEN = "your_bot_token"
+USE_REDIS = "true"
+REDIS_URL = "${{ Redis.REDIS_URL }}"
+CHECK_INTERVAL = "30"
+LOG_LEVEL = "INFO"
