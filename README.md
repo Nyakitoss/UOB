@@ -1,34 +1,43 @@
-# Telegram Unpin Bot
+# UOB - Personal Telegram Unpin Bot
 
-Автоматический бот для открепления сообщений определенных аккаунтов и ботов в чатах каналов.
+**Private bot for automatic message unpinning in channel chats.**
 
-## 🎯 Назначение
+## **IMPORTANT: Private Use Only**
 
-Бот решает проблему с засорением закрепленных сообщений в чатах привязанных к каналам. Он автоматически открепляет сообщения от указанных аккаунтов или ботов, оставляя закрепы от остальных пользователей.
+This bot is configured for **private use only** and will only respond to authorized users:
+- Personal Account: @Nyakitochka (ID: 493498734)
+- Work Account: @nikitamolchanovdd (ID: 7437085614)
 
-## 🚀 Возможности
+**Unauthorized users will receive:** "Sorry, this bot is for private use only."
 
-- **Автоматическое отслеживание** закрепленных сообщений
-- **Фильтрация по аккаунтам** - открепление сообщений определенных пользователей
-- **Фильтрация по ботам** - открепление сообщений определенных ботов
-- **Мониторинг нескольких чатов** одновременно
-- **Гибкая конфигурация** для каждого чата
-- **Redis хранилище** для надежности
-- **Логирование действий** для отладки
+## **Purpose**
 
-## 📋 Установка и настройка
+This bot solves the problem of cluttered pinned messages in channel chats by automatically unpining messages from specific accounts or bots while preserving pins from other users.
 
-### 1. Клонирование и установка зависимостей
+## **Features**
+
+- **Private Access Control** - Only authorized users can operate the bot
+- **Automatic Monitoring** - Tracks pinned messages in real-time
+- **Account Filtering** - Unpin messages from specific user accounts
+- **Bot Filtering** - Unpin messages from specific bots
+- **Multi-Chat Support** - Monitor multiple chats simultaneously
+- **Flexible Configuration** - Individual settings per chat
+- **Redis Storage** - Reliable persistent storage
+- **Comprehensive Logging** - Detailed action tracking
+
+## **Installation & Setup**
+
+### 1. Clone and Install Dependencies
 
 ```bash
-git clone <repository-url>
-cd unpin_bot
+git clone https://github.com/Nyakitoss/UOB.git
+cd UOB
 pip install -r requirements.txt
 ```
 
-### 2. Настройка переменных окружения
+### 2. Configure Environment Variables
 
-Скопируйте `.env.example` в `.env` и настройте:
+Copy `.env.example` to `.env` and configure:
 
 ```bash
 # Telegram API
@@ -36,147 +45,181 @@ API_ID=your_api_id
 API_HASH=your_api_hash
 BOT_TOKEN=your_bot_token
 
-# Redis (для Railway)
+# Redis (for Railway)
 USE_REDIS=true
 REDIS_URL=${{ Redis.REDIS_URL }}
 
-# Локальная разработка
+# Local Development
 # USE_REDIS=false
 # REDIS_HOST=localhost
 # REDIS_PORT=6379
 # REDIS_PASSWORD=your_redis_password
 
-# Настройки бота
-CHECK_INTERVAL=30  # секунд между проверками
+# Bot Settings
+CHECK_INTERVAL=30  # seconds between checks
 LOG_LEVEL=INFO
 ```
 
-### 3. Получение API_ID и API_HASH
+### 3. Get API Credentials
 
-1. Перейдите на [my.telegram.org](https://my.telegram.org)
-2. Войдите в свой аккаунт
-3. Создайте приложение
-4. Скопируйте `api_id` и `api_hash`
+1. Visit [my.telegram.org](https://my.telegram.org)
+2. Sign in with your account
+3. Create an application
+4. Copy `api_id` and `api_hash`
 
-### 4. Создание бота
+### 4. Create Bot
 
-1. Найдите [@BotFather](https://t.me/BotFather) в Telegram
-2. Отправьте `/newbot`
-3. Следуйте инструкциям
-4. Скопируйте токен бота
+1. Find [@BotFather](https://t.me/BotFather) on Telegram
+2. Send `/newbot`
+3. Follow instructions
+4. Copy the bot token
 
-## 🎮 Использование
+## **Usage**
 
-### Добавление чата в мониторинг
+### **Available Commands**
+
+- `/start` - Welcome message and help
+- `/add_chat` - Add chat to monitoring
+- `/remove_chat` - Remove chat from monitoring
+- `/list_chats` - List all monitored chats
+- `/config_chat` - Configure chat settings
+- `/status` - Show bot status and statistics
+
+### **Adding a Chat to Monitoring**
 
 ```
 /start
 /add_chat
-[перешлите сообщение из чата или отправьте @username]
+[forward message from chat or send @username]
 ```
 
-### Настройка фильтров
+### **Configuring Filters**
 
 ```
 /config_chat
-[перешлите сообщение из чата]
+[forward message from chat]
 accounts: @user1, @user2
 bots: @bot1, @bot2
 ```
 
-### Управление чатами
+### **Managing Chats**
 
-- `/list_chats` - Показать все чаты в мониторинге
-- `/remove_chat` - Удалить чат из мониторинга
-- `/status` - Показать статус бота
+- `/list_chats` - Show all monitored chats
+- `/remove_chat` - Remove chat from monitoring
+- `/status` - Bot status and statistics
 
-## 🔧 Как это работает
+## **How It Works**
 
-1. **Мониторинг**: Бот проверяет закрепленные сообщения каждые 30 секунд
-2. **Фильтрация**: Проверяет отправителя сообщения
-3. **Открепление**: Если отправитель в списке для открепления - убирает закреп
-4. **Логирование**: Записывает все действия для отладки
+1. **Monitoring**: Bot checks pinned messages every 30 seconds
+2. **Filtering**: Verifies message sender against configured lists
+3. **Unpinning**: Removes pins from matching accounts/bots
+4. **Logging**: Records all actions for audit trail
 
-## 📊 Структура конфигурации чата
+## **Security Features**
+
+- **Access Control**: Only authorized users can operate the bot
+- **Permission Verification**: Admin rights required for chat management
+- **Secure Storage**: Configurations stored in Redis
+- **Audit Logging**: All actions logged with user identification
+
+## **Chat Configuration Structure**
 
 ```json
 {
-  "chat_name": "Название чата",
-  "added_by": 123456789,
+  "chat_name": "Channel Discussion",
+  "added_by": 493498734,
   "added_at": "2026-04-17T10:30:00",
-  "accounts_to_unpin": ["@user1", "@user2"],
+  "accounts_to_unpin": ["@spam_user1", "@spam_user2"],
   "bots_to_unpin": ["@reminder_bot", "@news_bot"]
 }
 ```
 
-## 🚀 Развертывание на Railway
+## **Deployment on Railway**
 
-1. Создайте новый проект на Railway
-2. Добавьте Redis сервис
-3. Добавьте бот сервис
-4. Настройте переменные окружения:
+1. Create new project on Railway
+2. Add Redis service
+3. Add bot service from GitHub repository
+4. Configure environment variables:
    - `API_ID`, `API_HASH`, `BOT_TOKEN`
    - `REDIS_URL=${{ Redis.REDIS_URL }}`
    - `USE_REDIS=true`
 
-## 🔒 Безопасность
-
-- Бот требует права администратора с возможностью открепления сообщений
-- Проверка прав администратора перед добавлением чата
-- Безопасное хранение конфигураций в Redis
-- Логирование всех действий для аудита
-
-## 🛠️ Разработка
-
-### Структура проекта
+### **Required Environment Variables**
 
 ```
-unpin_bot/
-├── unpin_bot.py      # Основной код бота
-├── storage.py         # Управление хранилищем
-├── requirements.txt    # Зависимости Python
-├── .env.example      # Пример конфигурации
-└── README.md         # Документация
+API_ID=your_api_id
+API_HASH=your_api_hash
+BOT_TOKEN=your_bot_token
+USE_REDIS=true
+REDIS_URL=${{ Redis.REDIS_URL }}
+CHECK_INTERVAL=30
+LOG_LEVEL=INFO
 ```
 
-### Основные компоненты
-
-- **UnpinManager**: Управляет процессом открепления сообщений
-- **StorageManager**: Работа с Redis/локальным хранилищем
-- **Command Handlers**: Обработка команд пользователей
-- **Main Loop**: Основной цикл мониторинга
-
-## 📝 Логирование
-
-Бот использует детальное логирование всех действий:
+## **Project Structure**
 
 ```
+UOB/
+|-- unpin_bot.py      # Main bot code with access control
+|-- storage.py         # Redis/local storage management
+|-- requirements.txt    # Python dependencies
+|-- Dockerfile         # Container configuration
+|-- railway.toml       # Railway deployment settings
+|-- .env.example      # Environment variables template
+|-- README.md         # Documentation
+```
+
+## **Access Control System**
+
+The bot implements a dual-verification system:
+
+1. **User ID Verification** (Primary)
+   - Personal: 493498734 (@Nyakitochka)
+   - Work: 7437085614 (@nikitamolchanovdd)
+
+2. **Username Verification** (Backup)
+   - @nyakitochka
+   - @nikitamolchanovdd
+
+**Unauthorized access attempts are logged:**
+```
+**LOG: Unauthorized access attempt by User 123456789 (@unknown_user)**
+```
+
+## **Logging Examples**
+
+```
+**LOG: Personal Account (@Nyakitochka) accessed /start command**
+**LOG: Work Account (@nikitamolchanovdd) added chat to monitoring**
 **LOG: Unpinned bot message 123 from chat -1001234567890**
-**LOG: Chat MyChat added to monitoring**
 **LOG: Redis connected successfully**
 ```
 
-## 🔄 Обновление
+## **Troubleshooting**
 
-1. Остановите бота
-2. Выполните `git pull`
-3. Установите новые зависимости: `pip install -r requirements.txt`
-4. Перезапустите бота
+### Bot doesn't respond
+- Verify your user ID is in AUTHORIZED_USERS
+- Check bot has admin rights in target chat
+- Review logs for authorization errors
 
-## 🐛 Устранение неисправностей
+### Redis connection issues
+- Verify REDIS_URL variable
+- Ensure Redis service is running
+- Try local storage: `USE_REDIS=false`
 
-### Проблема: Бот не открепляет сообщения
-- Проверьте права администратора бота в чате
-- Убедитесь что в настройках указаны правильные аккаунты/боты
-- Проверьте логи на наличие ошибок
+### Messages not being unpinned
+- Check chat configuration
+- Verify account/bot usernames are correct
+- Ensure bot has unpinning permissions
 
-### Проблема: Redis не подключается
-- Проверьте переменную `REDIS_URL`
-- Убедитесь что Redis сервис запущен
-- Попробуйте локальное хранилище: `USE_REDIS=false`
+## **Updates**
 
-## 📄 Лицензия
+1. Stop the bot
+2. Run `git pull`
+3. Install dependencies: `pip install -r requirements.txt`
+4. Restart the bot
 
+## **License**
 MIT License
 
 ## 🤝 Поддержка

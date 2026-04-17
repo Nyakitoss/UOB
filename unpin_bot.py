@@ -20,6 +20,15 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", 30))  # seconds
 
+# Authorized users (personal and work accounts)
+AUTHORIZED_USERS = {
+    493498734: {"username": "Nyakitochka", "name": "Personal Account"},
+    7437085614: {"username": "nikitamolchanovdd", "name": "Work Account"}
+}
+
+# Additional authorized usernames (backup verification)
+AUTHORIZED_USERNAMES = {"nyakitochka", "nikitamolchanovdd"}
+
 DATA_DIR = Path("/app/data")
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -30,6 +39,31 @@ client = TelegramClient(
     API_ID,
     API_HASH
 )
+
+# ================== ACCESS CONTROL ==================
+
+def is_authorized(user_id: int, username: str = None) -> bool:
+    """Check if user is authorized to use the bot"""
+    # Check by user ID first (most reliable)
+    if user_id in AUTHORIZED_USERS:
+        return True
+    
+    # Check by username as backup
+    if username and username.lower() in AUTHORIZED_USERNAMES:
+        return True
+    
+    return False
+
+def get_user_info(user_id: int, username: str = None) -> str:
+    """Get user display name for authorized users"""
+    if user_id in AUTHORIZED_USERS:
+        user_data = AUTHORIZED_USERS[user_id]
+        return f"{user_data['name']} (@{user_data['username']})"
+    
+    if username and username.lower() in AUTHORIZED_USERNAMES:
+        return f"Authorized User (@{username})"
+    
+    return f"User {user_id}"
 
 # ================== UNPIN MANAGER ==================
 
@@ -133,21 +167,32 @@ async def start(event):
     if not event.is_private:
         return
     
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        print(f"**LOG: Unauthorized access attempt by User {user_id} (@{username})**")
+        return
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} accessed /start command**")
+    
     await event.reply(
-        "📌 **Bot for Automatic Message Unpinning**\n\n"
+        "Welcome to your **Personal Unpin Bot**! \n\n"
         "This bot automatically unpins messages from specific accounts or bots "
         "in linked channel chats.\n\n"
         "**Commands:**\n"
-        "• `/add_chat` - Add chat to monitoring\n"
-        "• `/remove_chat` - Remove chat from monitoring\n"
-        "• `/list_chats` - List monitored chats\n"
-        "• `/config_chat` - Configure chat settings\n"
-        "• `/status` - Show bot status\n\n"
+        "   `/add_chat` - Add chat to monitoring\n"
+        "   `/remove_chat` - Remove chat from monitoring\n"
+        "   `/list_chats` - List monitored chats\n"
+        "   `/config_chat` - Configure chat settings\n"
+        "   `/status` - Show bot status\n\n"
         "**How it works:**\n"
         "1. Add chat to monitoring\n"
         "2. Configure which accounts/bots to unpin\n"
         "3. Bot automatically checks and unpins messages\n\n"
-        "⚠️ Bot must be admin in the chat with unpinning rights."
+        "Bot must be admin in the chat with unpining rights."
     )
 
 @client.on(events.NewMessage(pattern="/add_chat"))
@@ -155,14 +200,24 @@ async def add_chat(event):
     if not event.is_private:
         return
     
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        return
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} accessed /add_chat command**")
+    
     await event.reply(
-        "📌 **Add Chat to Monitoring**\n\n"
+        "Add Chat to Monitoring\n\n"
         "Forward a message from the chat you want to monitor, "
         "or send the chat username (for public chats):\n\n"
         "Examples:\n"
-        "• Forward message from chat\n"
-        "• `@channel_username`\n"
-        "• `-1001234567890` (chat ID)\n\n"
+        "   Forward message from chat\n"
+        "   `@channel_username`\n"
+        "   `-1001234567890` (chat ID)\n\n"
         "The bot will automatically detect the chat and add it to monitoring."
     )
 
@@ -171,8 +226,18 @@ async def remove_chat(event):
     if not event.is_private:
         return
     
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        return
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} accessed /remove_chat command**")
+    
     await event.reply(
-        "🗑️ **Remove Chat from Monitoring**\n\n"
+        "Remove Chat from Monitoring\n\n"
         "Forward a message from the chat you want to remove from monitoring,\n"
         "or send the chat username/ID.\n\n"
         "This will stop automatic unpinning for that chat."
@@ -183,23 +248,33 @@ async def list_chats(event):
     if not event.is_private:
         return
     
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        return
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} accessed /list_chats command**")
+    
     configs = storage.get_chat_configs()
     
     if not configs:
-        await event.reply("📋 **No chats are currently monitored.**")
+        await event.reply("No chats are currently monitored.")
         return
     
-    response = "📋 **Monitored Chats:**\n\n"
+    response = "Monitored Chats:\n\n"
     
     for chat_id, config in configs.items():
         chat_name = config.get("chat_name", f"Chat {chat_id}")
         accounts_count = len(config.get("accounts_to_unpin", []))
         bots_count = len(config.get("bots_to_unpin", []))
         
-        response += f"📌 **{chat_name}**\n"
-        response += f"   • Accounts to unpin: {accounts_count}\n"
-        response += f"   • Bots to unpin: {bots_count}\n"
-        response += f"   • Added: {config.get('added_at', 'Unknown')}\n\n"
+        response += f"**{chat_name}**\n"
+        response += f"   Accounts to unpin: {accounts_count}\n"
+        response += f"   Bots to unpin: {bots_count}\n"
+        response += f"   Added: {config.get('added_at', 'Unknown')}\n\n"
     
     await event.reply(response)
 
@@ -208,16 +283,26 @@ async def status(event):
     if not event.is_private:
         return
     
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        return
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} accessed /status command**")
+    
     configs = storage.get_chat_configs()
     total_chats = len(configs)
     
     await event.reply(
-        f"🤖 **Bot Status**\n\n"
-        f"• **Active chats:** {total_chats}\n"
-        f"• **Check interval:** {CHECK_INTERVAL} seconds\n"
-        f"• **Storage:** {'Redis' if storage.use_redis else 'Local'}\n"
-        f"• **Uptime:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        f"✅ Bot is running and monitoring chats."
+        f"Bot Status\n\n"
+        f"Active chats: {total_chats}\n"
+        f"Check interval: {CHECK_INTERVAL} seconds\n"
+        f"Storage: {'Redis' if storage.use_redis else 'Local'}\n"
+        f"Uptime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        f"Bot is running and monitoring chats."
     )
 
 # ================== MESSAGE HANDLER ==================
@@ -226,6 +311,15 @@ async def status(event):
 async def handle_message(event):
     """Handle forwarded messages for chat management"""
     if not event.is_private:
+        return
+    
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    # Check authorization
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        print(f"**LOG: Unauthorized message from User {user_id} (@{username})**: {event.raw_text[:50]}...")
         return
     
     # Check if this is a forwarded message
