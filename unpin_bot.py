@@ -344,11 +344,19 @@ async def handle_direct_message(event):
         user_id = event.sender_id
         text = event.raw_text.strip()
         
-        # Check if text contains chat username or ID
-        if text.startswith('@') or text.startswith('-100'):
-            chat_identifier = text
-            # This will be processed in the main logic
-            await process_chat_action(user_id, chat_identifier, text, event)
+        # Skip if empty text
+        if not text:
+            return
+        
+        # Check if this looks like a chat identifier
+        # Skip if it's just a regular message (not a chat identifier)
+        if not (text.startswith('@') or text.startswith('-100') or text.isdigit()):
+            # This is a regular message, not a chat identifier
+            return
+        
+        chat_identifier = text
+        # This will be processed in the main logic
+        await process_chat_action(user_id, chat_identifier, text, event)
             
     except Exception as e:
         print(f"**LOG: Error handling direct message: {e}**")
@@ -357,16 +365,36 @@ async def process_chat_action(user_id: int, chat_identifier: str, text: str, eve
     """Process chat-related actions"""
     try:
         # Get chat entity (handle different input types)
+        entity = None
+        
         if chat_identifier.startswith('@'):
+            # Username format
             entity = await client.get_entity(chat_identifier)
         elif chat_identifier.startswith('-100'):
-            entity = await client.get_entity(int(chat_identifier))
-        else:
-            # Try as ID first, then as username
+            # Chat ID format
+            chat_id = int(chat_identifier)
+            entity = await client.get_entity(chat_id)
+        elif chat_identifier.isdigit():
+            # Numeric ID (try as chat ID first)
             try:
-                entity = await client.get_entity(int(chat_identifier))
+                chat_id = int(chat_identifier)
+                entity = await client.get_entity(chat_id)
             except:
+                # If not a chat, try as username
                 entity = await client.get_entity(chat_identifier)
+        else:
+            # Try as username
+            entity = await client.get_entity(chat_identifier)
+        
+        # Validate that we got a chat/channel entity
+        if not entity:
+            await event.reply(f"❌ Could not find chat: {chat_identifier}")
+            return
+        
+        # Check if it's actually a chat/channel (not a user)
+        if not hasattr(entity, 'title') and not hasattr(entity, 'username'):
+            await event.reply(f"❌ {chat_identifier} is not a chat or channel")
+            return
         
         chat_id = str(entity.id)
         chat_name = entity.title if hasattr(entity, 'title') else f"Chat {chat_id}"
@@ -393,6 +421,7 @@ async def process_chat_action(user_id: int, chat_identifier: str, text: str, eve
             
     except Exception as e:
         await event.reply(f"❌ Error processing chat: {str(e)}")
+        print(f"**LOG: Error in process_chat_action for {chat_identifier}: {e}**")
 
 async def add_chat_to_monitoring(user_id: int, chat_id: str, chat_name: str, event):
     """Add chat to monitoring list"""
