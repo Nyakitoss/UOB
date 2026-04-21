@@ -86,8 +86,11 @@ class UnpinManager:
         try:
             entity = await client.get_entity(int(chat_id))
             
-            # Get all pinned messages
-            pinned_messages = await client.get_messages(entity, limit=10, pinned=True)
+            # Get all pinned messages (using get_messages with limit)
+            pinned_messages = []
+            async for message in client.iter_messages(entity, limit=10):
+                if message and message.pinned:
+                    pinned_messages.append(message)
             
             if not pinned_messages:
                 return
@@ -101,7 +104,7 @@ class UnpinManager:
                     continue
                 
                 await self._check_and_unpin_message(message, accounts_to_unpin, bots_to_unpin, chat_id)
-                
+                    
         except Exception as e:
             print(f"**LOG: Error in _process_chat for {chat_id}: {e}**")
     
@@ -353,11 +356,17 @@ async def handle_direct_message(event):
 async def process_chat_action(user_id: int, chat_identifier: str, text: str, event):
     """Process chat-related actions"""
     try:
-        # Get chat entity
+        # Get chat entity (handle different input types)
         if chat_identifier.startswith('@'):
             entity = await client.get_entity(chat_identifier)
-        else:
+        elif chat_identifier.startswith('-100'):
             entity = await client.get_entity(int(chat_identifier))
+        else:
+            # Try as ID first, then as username
+            try:
+                entity = await client.get_entity(int(chat_identifier))
+            except:
+                entity = await client.get_entity(chat_identifier)
         
         chat_id = str(entity.id)
         chat_name = entity.title if hasattr(entity, 'title') else f"Chat {chat_id}"
@@ -368,8 +377,8 @@ async def process_chat_action(user_id: int, chat_identifier: str, text: str, eve
             if not perms.is_admin:
                 await event.reply("❌ You must be an admin in this chat to manage it.")
                 return
-        except:
-            await event.reply("❌ Bot doesn't have access to check permissions in this chat.")
+        except Exception as e:
+            await event.reply(f"❌ Bot doesn't have access to check permissions in this chat: {str(e)}")
             return
         
         # Determine action based on command context
@@ -379,7 +388,7 @@ async def process_chat_action(user_id: int, chat_identifier: str, text: str, eve
             await add_chat_to_monitoring(user_id, chat_id, chat_name, event)
         elif last_command == '/remove_chat':
             await remove_chat_from_monitoring(user_id, chat_id, chat_name, event)
-        elif last_command == '/config_chat':
+        elif last_command in ['/config_chat', '/chat_config']:
             await configure_chat(user_id, chat_id, chat_name, event)
             
     except Exception as e:
