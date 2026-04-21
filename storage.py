@@ -10,7 +10,15 @@ load_dotenv()
 
 class StorageManager:
     def __init__(self):
+        # Debug environment variables
+        print(f"**LOG: Environment variables debug:**")
+        print(f"**LOG: USE_REDIS = '{os.getenv('USE_REDIS')}'**")
+        print(f"**LOG: REDIS_URL = '{os.getenv('REDIS_URL')}'**")
+        print(f"**LOG: REDIS_HOST = '{os.getenv('REDIS_HOST')}'**")
+        print(f"**LOG: REDIS_PORT = '{os.getenv('REDIS_PORT')}'**")
+        
         self.use_redis = os.getenv("USE_REDIS", "false").lower() == "true"
+        print(f"**LOG: Redis enabled = {self.use_redis}**")
         
         if self.use_redis:
             self.redis_client = self._create_redis_client()
@@ -18,6 +26,7 @@ class StorageManager:
         else:
             self.redis_client = None
             self._local_storage = {}
+            print("**LOG: Using local storage (Redis disabled)**")
     
     def _create_redis_client(self):
         """Create Redis client from URL or individual parameters"""
@@ -43,10 +52,13 @@ class StorageManager:
     
     def _test_redis_connection(self):
         try:
-            self.redis_client.ping()
+            print(f"**LOG: Testing Redis connection...**")
+            result = self.redis_client.ping()
+            print(f"**LOG: Redis ping result: {result}**")
             print("**LOG: Redis connected successfully**")
         except Exception as e:
             print(f"**LOG: Redis connection failed: {e}**")
+            print(f"**LOG: Error type: {type(e).__name__}**")
             print("**LOG: Falling back to local storage**")
             self.use_redis = False
             self.redis_client = None

@@ -245,9 +245,6 @@ async def remove_chat(event):
 
 @client.on(events.NewMessage(pattern="/list_chats"))
 async def list_chats(event):
-    if not event.is_private:
-        return
-    
     user_id = event.sender_id
     username = getattr(event.sender, 'username', None)
     
@@ -280,9 +277,6 @@ async def list_chats(event):
 
 @client.on(events.NewMessage(pattern="/status"))
 async def status(event):
-    if not event.is_private:
-        return
-    
     user_id = event.sender_id
     username = getattr(event.sender, 'username', None)
     
@@ -310,9 +304,6 @@ async def status(event):
 @client.on(events.NewMessage)
 async def handle_message(event):
     """Handle forwarded messages for chat management"""
-    if not event.is_private:
-        return
-    
     user_id = event.sender_id
     username = getattr(event.sender, 'username', None)
     
