@@ -110,20 +110,19 @@ class UnpinManager:
             if not pinned_messages:
                 return
             
-            # Get accounts/bots to unpin
-            accounts_to_unpin = config.get("accounts_to_unpin", [])
-            bots_to_unpin = config.get("bots_to_unpin", [])
+            # Get usernames to unpin
+            usernames_to_unpin = config.get("usernames_to_unpin", [])
             
             for message in pinned_messages:
                 if not message:
                     continue
                 
-                await self._check_and_unpin_message(message, accounts_to_unpin, bots_to_unpin, chat_id)
+                await self._check_and_unpin_message(message, usernames_to_unpin, chat_id)
                     
         except Exception as e:
             print(f"**LOG: Error in _process_chat for {chat_id}: {e}**")
     
-    async def _check_and_unpin_message(self, message, accounts_to_unpin: list, bots_to_unpin: list, chat_id: str):
+    async def _check_and_unpin_message(self, message, usernames_to_unpin: list, chat_id: str):
         """Check if message should be unpinned and unpin it"""
         try:
             message_id = message.id
@@ -133,27 +132,37 @@ class UnpinManager:
             if message_id in self.processed_messages:
                 return
             
-            # Check if sender is in accounts to unpin
-            if sender_id in accounts_to_unpin:
-                await self._unpin_message(message, chat_id, "account")
-                return
+            # Get sender info
+            sender = await client.get_entity(sender_id)
+            sender_username = getattr(sender, 'username', None)
             
-            # Check if sender is a bot and in bots to unpin list
-            if message.from_id and hasattr(message.from_id, 'user_id'):
-                sender_info = await client.get_entity(message.from_id.user_id)
-                if sender_info.bot and sender_info.username in bots_to_unpin:
-                    await self._unpin_message(message, chat_id, "bot")
-                    return
+            # Check if sender username is in usernames to unpin
+            should_unpin = False
+            if sender_username:
+                sender_username_lower = sender_username.lower()
+                for username in usernames_to_unpin:
+                    if username.lower().lstrip('@') == sender_username_lower:
+                        should_unpin = True
+                        reason = f"@{sender_username}"
+                        break
             
-            # Add to processed to avoid rechecking
-            self.processed_messages.add(message_id)
-            
-            # Clean old processed messages (keep last 1000)
-            if len(self.processed_messages) > 1000:
-                self.processed_messages = set(list(self.processed_messages)[-500:])
+            if should_unpin:
+                await client.unpin_message(message, chat_id)
+                self.processed_messages.add(message_id)
                 
+                # Track unpinned message
+                message_info = {
+                    'message_id': message_id,
+                    'chat_id': chat_id,
+                    'unpinned_at': datetime.now().isoformat(),
+                    'reason': reason
+                }
+                storage.add_pinned_message(chat_id, message_info)
+                
+                print(f"**LOG: Unpinned {reason} message {message_id} from chat {chat_id}**")
+            
         except Exception as e:
-            print(f"**LOG: Error checking message {message.id}: {e}**")
+            print(f"**LOG: Error unpinning message {message.id}: {e}**")
     
     async def _unpin_message(self, message, chat_id: str, message_type: str):
         """Unpin a message and log the action"""
@@ -411,17 +420,20 @@ async def handle_message(event):
     current_state = get_user_state(user_id)
     
     if current_state:
-        # User is in a command mode, handle chat ID input
+        # User is in a command mode
         text = event.raw_text.strip()
         
         # Handle forwarded messages
         if event.fwd_from:
             await handle_forwarded_message(event)
+        elif current_state == 'config_chat_username':
+            # Handle username input for config_chat
+            await handle_username_input(user_id, text, event)
         elif text:
             # Handle direct message with chat ID
             await handle_chat_input(user_id, text, event, current_state)
         else:
-            await event.reply("❌ Please send a valid chat ID or username.")
+            await event.reply("❌ Please send a valid input.")
     else:
         # User is in normal mode
         # If they send something that looks like a chat ID without command, ask for command
@@ -451,17 +463,74 @@ async def handle_chat_input(user_id: int, text: str, event, state: str):
         # Process based on state
         if state == 'add_chat':
             await process_chat_action(user_id, text, event, 'add_chat')
+            clear_user_state(user_id)
         elif state == 'remove_chat':
             await process_chat_action(user_id, text, event, 'remove_chat')
+            clear_user_state(user_id)
         elif state == 'config_chat':
+            # For config_chat, process chat ID then ask for username
             await process_chat_action(user_id, text, event, 'config_chat')
-        
-        # Clear state after processing
-        clear_user_state(user_id)
+            # Set state to wait for username input
+            set_user_state(user_id, 'config_chat_username')
+            await event.reply(
+                "⚙️ **Configure Chat - Add Username**\n\n"
+                "Please send the @username to unpin messages from:\n\n"
+                "Example: `@username_to_unpin`\n\n"
+                "Use `/exit` to cancel."
+            )
         
     except Exception as e:
         await event.reply(f"❌ Error: {str(e)}")
         print(f"**LOG: Error in handle_chat_input: {e}**")
+
+async def handle_username_input(user_id: int, text: str, event):
+    """Handle username input for config_chat"""
+    try:
+        # Validate input looks like a username
+        if not text.startswith('@'):
+            await event.reply(
+                "❌ Invalid format. Please send a valid @username.\n\n"
+                "Example: `@username_to_unpin`\n\n"
+                "Use `/exit` to cancel."
+            )
+            return
+        
+        # Store the username for the last configured chat
+        # For simplicity, we'll store it in a temporary dict
+        if not hasattr(event, '_config_chat_id'):
+            await event.reply("❌ Error: No chat configured. Please start over with /config_chat")
+            clear_user_state(user_id)
+            return
+        
+        chat_id = event._config_chat_id
+        
+        # Add username to chat configuration
+        config = storage.get_chat_config(chat_id)
+        if not config:
+            await event.reply("❌ Error: Chat not found in monitoring.")
+            clear_user_state(user_id)
+            return
+        
+        # Add username to usernames_to_unpin list
+        if 'usernames_to_unpin' not in config:
+            config['usernames_to_unpin'] = []
+        
+        config['usernames_to_unpin'].append(text)
+        storage.update_chat_config(chat_id, config)
+        
+        await event.reply(
+            f"✅ **Added username to unpin list**\n\n"
+            f"Chat: {config.get('chat_name', 'Unknown')}\n"
+            f"Username: {text}\n\n"
+            f"Total usernames to unpin: {len(config['usernames_to_unpin'])}\n\n"
+            f"Add more usernames or use `/exit` to finish."
+        )
+        
+        # Keep user in config_chat_username state to allow adding more usernames
+        
+    except Exception as e:
+        await event.reply(f"❌ Error: {str(e)}")
+        print(f"**LOG: Error in handle_username_input: {e}**")
 
 async def handle_forwarded_message(event):
     """Handle forwarded messages for chat identification"""
@@ -546,6 +615,8 @@ async def process_chat_action(user_id: int, chat_identifier: str, event, action:
         elif action == 'remove_chat':
             await remove_chat_from_monitoring(user_id, chat_id, chat_name, event)
         elif action == 'config_chat':
+            # Store chat_id in event for username input
+            event._config_chat_id = chat_id
             await configure_chat(user_id, chat_id, chat_name, event)
             
     except Exception as e:
@@ -600,18 +671,26 @@ async def configure_chat(user_id: int, chat_id: str, chat_name: str, event):
             await event.reply("❌ Chat not found in monitoring list.")
             return
         
+        # Initialize usernames_to_unpin if not exists
+        if 'usernames_to_unpin' not in config:
+            config['usernames_to_unpin'] = []
+            storage.update_chat_config(chat_id, config)
+        
+        usernames = config.get('usernames_to_unpin', [])
+        
         response = f"⚙️ **Configure Chat: {chat_name}**\n\n"
         response += f"Chat ID: {chat_id}\n\n"
-        response += f"**Current settings:**\n"
-        response += f"• Accounts to unpin: {len(config.get('accounts_to_unpin', []))}\n"
-        response += f"• Bots to unpin: {len(config.get('bots_to_unpin', []))}\n\n"
-        response += f"**To add accounts/bots to unpin:**\n"
-        response += f"Send usernames or IDs in format:\n"
-        response += f"`accounts: @username1, @username2`\n"
-        response += f"`bots: @bot1, @bot2`\n\n"
-        response += f"**To remove:**\n"
-        response += f"`remove_accounts: @username1`\n"
-        response += f"`remove_bots: @bot1`"
+        response += f"**Usernames to unpin:**\n"
+        
+        if usernames:
+            for username in usernames:
+                response += f"• {username}\n"
+        else:
+            response += "• No usernames configured\n"
+        
+        response += f"\n**Total:** {len(usernames)} username(s)\n\n"
+        response += f"**Next:** Send @username to add to unpin list\n\n"
+        response += f"Use `/exit` to finish."
         
         await event.reply(response)
         
