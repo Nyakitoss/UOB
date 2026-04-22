@@ -531,7 +531,7 @@ async def handle_username_input(user_id: int, text: str, event):
             config['usernames_to_unpin'] = []
         
         config['usernames_to_unpin'].append(text)
-        storage.update_chat_config(chat_id, config)
+        storage.save_chat_config(chat_id, config)
         
         await event.reply(
             f"✅ **Added username to unpin list**\n\n"
@@ -689,7 +689,7 @@ async def configure_chat(user_id: int, chat_id: str, chat_name: str, event):
         # Initialize usernames_to_unpin if not exists
         if 'usernames_to_unpin' not in config:
             config['usernames_to_unpin'] = []
-            storage.update_chat_config(chat_id, config)
+            storage.save_chat_config(chat_id, config)
         
         usernames = config.get('usernames_to_unpin', [])
         
