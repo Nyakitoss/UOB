@@ -298,6 +298,8 @@ async def status(event):
         f"Active chats: {total_chats}\n"
         f"Check interval: {CHECK_INTERVAL} seconds\n"
         f"Storage: {'Redis' if storage.use_redis else 'Local'}\n"
+        f"Redis Status: {'Connected' if storage.use_redis and storage.redis_client else 'Disconnected'}\n"
+        f"Redis URL: {os.getenv('REDIS_URL', 'Not configured')}\n"
         f"Uptime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         f"Bot is running and monitoring chats."
     )
@@ -510,12 +512,21 @@ async def main_loop():
 # ================== MAIN ==================
 
 async def main():
-    await client.start(bot_token=BOT_TOKEN)
-    
     print("=" * 50)
     print("=== UNPIN BOT STARTED ===")
     print(f"Server time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Storage: {'Redis' if storage.use_redis else 'Local'}")
+    
+    # Check environment variables
+    print(f"Environment check:")
+    print(f"  API_ID: {'Set' if os.getenv('API_ID') else 'Missing'}")
+    print(f"  API_HASH: {'Set' if os.getenv('API_HASH') else 'Missing'}")
+    print(f"  BOT_TOKEN: {'Set' if os.getenv('BOT_TOKEN') else 'Missing'}")
+    print(f"  USE_REDIS: {os.getenv('USE_REDIS')}")
+    print(f"  REDIS_URL: {'Set' if os.getenv('REDIS_URL') else 'Missing'}")
+    
+    await client.start(bot_token=BOT_TOKEN)
+    
     print("=" * 50)
     
     # Start main monitoring loop
