@@ -45,6 +45,9 @@ client = TelegramClient(
 # User states: None (normal), 'add_chat', 'remove_chat', 'config_chat'
 user_states = {}
 
+# Store current config chat ID for each user
+user_config_chat = {}
+
 def set_user_state(user_id: int, state: str = None):
     """Set user state"""
     user_states[user_id] = state
@@ -57,6 +60,16 @@ def clear_user_state(user_id: int):
     """Clear user state"""
     if user_id in user_states:
         del user_states[user_id]
+    if user_id in user_config_chat:
+        del user_config_chat[user_id]
+
+def set_config_chat_id(user_id: int, chat_id: str):
+    """Set current config chat ID for user"""
+    user_config_chat[user_id] = chat_id
+
+def get_config_chat_id(user_id: int) -> str:
+    """Get current config chat ID for user"""
+    return user_config_chat.get(user_id)
 
 # ================== ACCESS CONTROL ==================
 
@@ -316,12 +329,15 @@ async def list_chats(event):
     
     for chat_id, config in configs.items():
         chat_name = config.get("chat_name", f"Chat {chat_id}")
-        accounts_count = len(config.get("accounts_to_unpin", []))
-        bots_count = len(config.get("bots_to_unpin", []))
+        usernames = config.get("usernames_to_unpin", [])
         
         response += f"**{chat_name}**\n"
-        response += f"   Accounts to unpin: {accounts_count}\n"
-        response += f"   Bots to unpin: {bots_count}\n"
+        response += f"   Usernames to unpin: {len(usernames)}\n"
+        
+        if usernames:
+            for username in usernames:
+                response += f"      • {username}\n"
+        
         response += f"   Added: {config.get('added_at', 'Unknown')}\n\n"
     
     await event.reply(response)
@@ -495,14 +511,13 @@ async def handle_username_input(user_id: int, text: str, event):
             )
             return
         
-        # Store the username for the last configured chat
-        # For simplicity, we'll store it in a temporary dict
-        if not hasattr(event, '_config_chat_id'):
+        # Get current config chat ID from persistent storage
+        chat_id = get_config_chat_id(user_id)
+        
+        if not chat_id:
             await event.reply("❌ Error: No chat configured. Please start over with /config_chat")
             clear_user_state(user_id)
             return
-        
-        chat_id = event._config_chat_id
         
         # Add username to chat configuration
         config = storage.get_chat_config(chat_id)
@@ -615,8 +630,8 @@ async def process_chat_action(user_id: int, chat_identifier: str, event, action:
         elif action == 'remove_chat':
             await remove_chat_from_monitoring(user_id, chat_id, chat_name, event)
         elif action == 'config_chat':
-            # Store chat_id in event for username input
-            event._config_chat_id = chat_id
+            # Store chat_id in persistent storage for username input
+            set_config_chat_id(user_id, chat_id)
             await configure_chat(user_id, chat_id, chat_name, event)
             
     except Exception as e:
