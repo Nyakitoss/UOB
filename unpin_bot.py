@@ -200,9 +200,6 @@ async def start(event):
 
 @client.on(events.NewMessage(pattern="/add_chat"))
 async def add_chat(event):
-    if not event.is_private:
-        return
-    
     user_id = event.sender_id
     username = getattr(event.sender, 'username', None)
     
@@ -212,6 +209,9 @@ async def add_chat(event):
     
     user_info = get_user_info(user_id, username)
     print(f"**LOG: {user_info} accessed /add_chat command**")
+    
+    # Set last command context
+    event._last_command = '/add_chat'
     
     await event.reply(
         "Add Chat to Monitoring\n\n"
@@ -226,9 +226,6 @@ async def add_chat(event):
 
 @client.on(events.NewMessage(pattern="/remove_chat"))
 async def remove_chat(event):
-    if not event.is_private:
-        return
-    
     user_id = event.sender_id
     username = getattr(event.sender, 'username', None)
     
@@ -238,6 +235,9 @@ async def remove_chat(event):
     
     user_info = get_user_info(user_id, username)
     print(f"**LOG: {user_info} accessed /remove_chat command**")
+    
+    # Set last command context
+    event._last_command = '/remove_chat'
     
     await event.reply(
         "Remove Chat from Monitoring\n\n"
@@ -277,6 +277,50 @@ async def list_chats(event):
         response += f"   Added: {config.get('added_at', 'Unknown')}\n\n"
     
     await event.reply(response)
+
+@client.on(events.NewMessage(pattern="/config_chat"))
+async def config_chat(event):
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        return
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} accessed /config_chat command**")
+    
+    # Set last command context
+    event._last_command = '/config_chat'
+    
+    await event.reply(
+        "Configure Chat Settings\n\n"
+        "Forward a message from the chat you want to configure,\n"
+        "or send the chat username/ID.\n\n"
+        "This will show current settings and allow you to add/remove accounts/bots to unpin."
+    )
+
+@client.on(events.NewMessage(pattern="/chat_config"))
+async def chat_config(event):
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        return
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} accessed /chat_config command**")
+    
+    # Set last command context
+    event._last_command = '/chat_config'
+    
+    await event.reply(
+        "Configure Chat Settings\n\n"
+        "Forward a message from the chat you want to configure,\n"
+        "or send the chat username/ID.\n\n"
+        "This will show current settings and allow you to add/remove accounts/bots to unpin."
+    )
 
 @client.on(events.NewMessage(pattern="/status"))
 async def status(event):
