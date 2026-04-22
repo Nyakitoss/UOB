@@ -40,29 +40,44 @@ client = TelegramClient(
     API_HASH
 )
 
+# ================== USER STATE MANAGEMENT ==================
+
+# User states: None (normal), 'add_chat', 'remove_chat', 'config_chat'
+user_states = {}
+
+def set_user_state(user_id: int, state: str = None):
+    """Set user state"""
+    user_states[user_id] = state
+
+def get_user_state(user_id: int) -> str:
+    """Get user state"""
+    return user_states.get(user_id)
+
+def clear_user_state(user_id: int):
+    """Clear user state"""
+    if user_id in user_states:
+        del user_states[user_id]
+
 # ================== ACCESS CONTROL ==================
 
 def is_authorized(user_id: int, username: str = None) -> bool:
     """Check if user is authorized to use the bot"""
-    # Check by user ID first (most reliable)
     if user_id in AUTHORIZED_USERS:
         return True
     
-    # Check by username as backup
     if username and username.lower() in AUTHORIZED_USERNAMES:
         return True
     
     return False
 
 def get_user_info(user_id: int, username: str = None) -> str:
-    """Get user display name for authorized users"""
-    if user_id in AUTHORIZED_USERS:
-        user_data = AUTHORIZED_USERS[user_id]
-        return f"{user_data['name']} (@{user_data['username']})"
-    
-    if username and username.lower() in AUTHORIZED_USERNAMES:
-        return f"Authorized User (@{username})"
-    
+    """Get user info string for logging"""
+    if user_id == 493498734:
+        return "Personal Account (@Nyakitochka)"
+    elif user_id == 7437085614:
+        return "Work Account (@nikitamolchanovdd)"
+    elif username and username.lower() in AUTHORIZED_USERNAMES:
+        return f"User {user_id} (@{username})"
     return f"User {user_id}"
 
 # ================== UNPIN MANAGER ==================
@@ -167,35 +182,57 @@ class UnpinManager:
 
 @client.on(events.NewMessage(pattern="/start"))
 async def start(event):
-    if not event.is_private:
-        return
-    
     user_id = event.sender_id
     username = getattr(event.sender, 'username', None)
     
     if not is_authorized(user_id, username):
         await event.reply("Sorry, this bot is for private use only.")
-        print(f"**LOG: Unauthorized access attempt by User {user_id} (@{username})**")
         return
     
     user_info = get_user_info(user_id, username)
     print(f"**LOG: {user_info} accessed /start command**")
     
+    # Clear any existing state
+    clear_user_state(user_id)
+    
     await event.reply(
-        "Welcome to your **Personal Unpin Bot**! \n\n"
+        "🤖 **Personal Unpin Bot**\n\n"
         "This bot automatically unpins messages from specific accounts or bots "
         "in linked channel chats.\n\n"
-        "**Commands:**\n"
+        "**Available Commands:**\n"
         "   `/add_chat` - Add chat to monitoring\n"
         "   `/remove_chat` - Remove chat from monitoring\n"
         "   `/list_chats` - List monitored chats\n"
         "   `/config_chat` - Configure chat settings\n"
-        "   `/status` - Show bot status\n\n"
+        "   `/status` - Show bot status\n"
+        "   `/exit` - Exit current command mode\n\n"
         "**How it works:**\n"
-        "1. Add chat to monitoring\n"
-        "2. Configure which accounts/bots to unpin\n"
-        "3. Bot automatically checks and unpins messages\n\n"
+        "1. Use command to start action\n"
+        "2. Send chat ID when requested\n"
+        "3. Bot processes the action\n"
+        "4. Use /exit to cancel\n\n"
         "Bot must be admin in the chat with unpining rights."
+    )
+
+@client.on(events.NewMessage(pattern="/exit"))
+async def exit_mode(event):
+    user_id = event.sender_id
+    username = getattr(event.sender, 'username', None)
+    
+    if not is_authorized(user_id, username):
+        await event.reply("Sorry, this bot is for private use only.")
+        return
+    
+    # Clear user state
+    clear_user_state(user_id)
+    
+    user_info = get_user_info(user_id, username)
+    print(f"**LOG: {user_info} used /exit command**")
+    
+    await event.reply(
+        "🚪 **Exited command mode**\n\n"
+        "You are now back to the main menu.\n"
+        "Use /start to see available commands."
     )
 
 @client.on(events.NewMessage(pattern="/add_chat"))
@@ -210,18 +247,17 @@ async def add_chat(event):
     user_info = get_user_info(user_id, username)
     print(f"**LOG: {user_info} accessed /add_chat command**")
     
-    # Set last command context
-    event._last_command = '/add_chat'
+    # Set user state to waiting for chat ID
+    set_user_state(user_id, 'add_chat')
     
     await event.reply(
-        "Add Chat to Monitoring\n\n"
-        "Forward a message from the chat you want to monitor, "
-        "or send the chat username (for public chats):\n\n"
+        "➕ **Add Chat to Monitoring**\n\n"
+        "Please send the chat ID or username:\n\n"
         "Examples:\n"
-        "   Forward message from chat\n"
         "   `@channel_username`\n"
-        "   `-1001234567890` (chat ID)\n\n"
-        "The bot will automatically detect the chat and add it to monitoring."
+        "   `-1001234567890`\n"
+        "   `1234567890`\n\n"
+        "Use `/exit` to cancel."
     )
 
 @client.on(events.NewMessage(pattern="/remove_chat"))
@@ -236,14 +272,17 @@ async def remove_chat(event):
     user_info = get_user_info(user_id, username)
     print(f"**LOG: {user_info} accessed /remove_chat command**")
     
-    # Set last command context
-    event._last_command = '/remove_chat'
+    # Set user state to waiting for chat ID
+    set_user_state(user_id, 'remove_chat')
     
     await event.reply(
-        "Remove Chat from Monitoring\n\n"
-        "Forward a message from the chat you want to remove from monitoring,\n"
-        "or send the chat username/ID.\n\n"
-        "This will stop automatic unpinning for that chat."
+        "➖ **Remove Chat from Monitoring**\n\n"
+        "Please send the chat ID or username:\n\n"
+        "Examples:\n"
+        "   `@channel_username`\n"
+        "   `-1001234567890`\n"
+        "   `1234567890`\n\n"
+        "Use `/exit` to cancel."
     )
 
 @client.on(events.NewMessage(pattern="/list_chats"))
@@ -290,14 +329,17 @@ async def config_chat(event):
     user_info = get_user_info(user_id, username)
     print(f"**LOG: {user_info} accessed /config_chat command**")
     
-    # Set last command context
-    event._last_command = '/config_chat'
+    # Set user state to waiting for chat ID
+    set_user_state(user_id, 'config_chat')
     
     await event.reply(
-        "Configure Chat Settings\n\n"
-        "Forward a message from the chat you want to configure,\n"
-        "or send the chat username/ID.\n\n"
-        "This will show current settings and allow you to add/remove accounts/bots to unpin."
+        "⚙️ **Configure Chat Settings**\n\n"
+        "Please send the chat ID or username:\n\n"
+        "Examples:\n"
+        "   `@channel_username`\n"
+        "   `-1001234567890`\n"
+        "   `1234567890`\n\n"
+        "Use `/exit` to cancel."
     )
 
 @client.on(events.NewMessage(pattern="/chat_config"))
@@ -312,14 +354,17 @@ async def chat_config(event):
     user_info = get_user_info(user_id, username)
     print(f"**LOG: {user_info} accessed /chat_config command**")
     
-    # Set last command context
-    event._last_command = '/chat_config'
+    # Set user state to waiting for chat ID
+    set_user_state(user_id, 'config_chat')
     
     await event.reply(
-        "Configure Chat Settings\n\n"
-        "Forward a message from the chat you want to configure,\n"
-        "or send the chat username/ID.\n\n"
-        "This will show current settings and allow you to add/remove accounts/bots to unpin."
+        "⚙️ **Configure Chat Settings**\n\n"
+        "Please send the chat ID or username:\n\n"
+        "Examples:\n"
+        "   `@channel_username`\n"
+        "   `-1001234567890`\n"
+        "   `1234567890`\n\n"
+        "Use `/exit` to cancel."
     )
 
 @client.on(events.NewMessage(pattern="/status"))
@@ -352,7 +397,7 @@ async def status(event):
 
 @client.on(events.NewMessage)
 async def handle_message(event):
-    """Handle forwarded messages for chat management"""
+    """Handle messages based on user state"""
     user_id = event.sender_id
     username = getattr(event.sender, 'username', None)
     
@@ -362,52 +407,92 @@ async def handle_message(event):
         print(f"**LOG: Unauthorized message from User {user_id} (@{username})**: {event.raw_text[:50]}...")
         return
     
-    # Check if this is a forwarded message
-    if event.fwd_from:
-        await handle_forwarded_message(event)
+    # Check user state
+    current_state = get_user_state(user_id)
+    
+    if current_state:
+        # User is in a command mode, handle chat ID input
+        text = event.raw_text.strip()
+        
+        # Handle forwarded messages
+        if event.fwd_from:
+            await handle_forwarded_message(event)
+        elif text:
+            # Handle direct message with chat ID
+            await handle_chat_input(user_id, text, event, current_state)
+        else:
+            await event.reply("❌ Please send a valid chat ID or username.")
     else:
-        await handle_direct_message(event)
+        # User is in normal mode
+        # If they send something that looks like a chat ID without command, ask for command
+        text = event.raw_text.strip()
+        if text and (text.startswith('@') or text.startswith('-100') or text.isdigit()):
+            await event.reply(
+                "❌ Please use a command first.\n\n"
+                "Use `/start` to see available commands."
+            )
+        # Otherwise ignore (let command handlers process commands)
+
+async def handle_chat_input(user_id: int, text: str, event, state: str):
+    """Handle chat ID input based on user state"""
+    try:
+        # Validate input looks like a chat identifier
+        if not (text.startswith('@') or text.startswith('-100') or text.isdigit()):
+            await event.reply(
+                "❌ Invalid format. Please send a valid chat ID or username.\n\n"
+                "Examples:\n"
+                "   `@channel_username`\n"
+                "   `-1001234567890`\n"
+                "   `1234567890`\n\n"
+                "Use `/exit` to cancel."
+            )
+            return
+        
+        # Process based on state
+        if state == 'add_chat':
+            await process_chat_action(user_id, text, event, 'add_chat')
+        elif state == 'remove_chat':
+            await process_chat_action(user_id, text, event, 'remove_chat')
+        elif state == 'config_chat':
+            await process_chat_action(user_id, text, event, 'config_chat')
+        
+        # Clear state after processing
+        clear_user_state(user_id)
+        
+    except Exception as e:
+        await event.reply(f"❌ Error: {str(e)}")
+        print(f"**LOG: Error in handle_chat_input: {e}**")
 
 async def handle_forwarded_message(event):
     """Handle forwarded messages for chat identification"""
     try:
         user_id = event.sender_id
-        text = event.raw_text.strip()
+        current_state = get_user_state(user_id)
         
         # Get the original chat from forwarded message
         if event.fwd_from.from_id:
             chat_id = event.fwd_from.from_id.chat_id if hasattr(event.fwd_from.from_id, 'chat_id') else None
-            
             if chat_id:
-                await process_chat_action(user_id, chat_id, text, event)
+                chat_identifier = str(chat_id)
+                # Process based on state
+                if current_state == 'add_chat':
+                    await process_chat_action(user_id, chat_identifier, event, 'add_chat')
+                elif current_state == 'remove_chat':
+                    await process_chat_action(user_id, chat_identifier, event, 'remove_chat')
+                elif current_state == 'config_chat':
+                    await process_chat_action(user_id, chat_identifier, event, 'config_chat')
                 
-    except Exception as e:
-        print(f"**LOG: Error handling forwarded message: {e}**")
-
-async def handle_direct_message(event):
-    """Handle direct messages with chat usernames/IDs"""
-    try:
-        user_id = event.sender_id
-        text = event.raw_text.strip()
+                # Clear state after processing
+                clear_user_state(user_id)
+                return
         
-        # Skip if empty text
-        if not text:
-            return
-        
-        # Check if this looks like a chat identifier
-        # Skip if it's just a regular message (not a chat identifier)
-        if not (text.startswith('@') or text.startswith('-100') or text.isdigit()):
-            # This is a regular message, not a chat identifier
-            return
-        
-        chat_identifier = text
-        # This will be processed in the main logic
-        await process_chat_action(user_id, chat_identifier, text, event)
+        await event.reply("❌ Could not extract chat information from forwarded message. Please send chat ID directly.")
             
     except Exception as e:
-        print(f"**LOG: Error handling direct message: {e}**")
+        await event.reply(f"❌ Error handling forwarded message: {str(e)}")
+        print(f"**LOG: Error in handle_forwarded_message: {e}**")
 
-async def process_chat_action(user_id: int, chat_identifier: str, text: str, event):
+async def process_chat_action(user_id: int, chat_identifier: str, event, action: str):
     """Process chat-related actions"""
     try:
         # Get chat entity (handle different input types)
@@ -455,14 +540,12 @@ async def process_chat_action(user_id: int, chat_identifier: str, text: str, eve
             await event.reply(f"❌ Bot doesn't have access to check permissions in this chat: {str(e)}")
             return
         
-        # Determine action based on command context
-        last_command = getattr(event, '_last_command', '/add_chat')
-        
-        if last_command == '/add_chat':
+        # Determine action based on action parameter
+        if action == 'add_chat':
             await add_chat_to_monitoring(user_id, chat_id, chat_name, event)
-        elif last_command == '/remove_chat':
+        elif action == 'remove_chat':
             await remove_chat_from_monitoring(user_id, chat_id, chat_name, event)
-        elif last_command in ['/config_chat', '/chat_config']:
+        elif action == 'config_chat':
             await configure_chat(user_id, chat_id, chat_name, event)
             
     except Exception as e:
